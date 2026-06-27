@@ -1,0 +1,55 @@
+{
+  "expo": {
+    "name": "SimpleNotes",
+    "slug": "simplenotes-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "54.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "scheme": "simplenotes",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#3b82f6"
+    },
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.simplenotes.mobile",
+      "infoPlist": {
+        "NSCameraUsageDescription": "SimpleNotes uses the camera to attach photos to notes.",
+        "NSLocationWhenInUseUsageDescription": "SimpleNotes can tag notes with your location.",
+        "NSPhotoLibraryUsageDescription": "SimpleNotes saves captured photos to your notes."
+      }
+    },
+    "android": {
+      "package": "com.simplenotes.mobile",
+      "permissions": ["CAMERA", "ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
+      "adaptiveIcon": {
+        "backgroundColor": "#3b82f6"
+      }
+    },
+    "plugins": [
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow SimpleNotes to access your camera to attach photos to notes."
+        }
+      ],
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Allow SimpleNotes to use your location to tag notes."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "color": "#3b82f6"
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {}
+    }
+  }
+}
