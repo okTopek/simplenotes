@@ -1,21 +1,116 @@
+import os
+import uuid
 from datetime import datetime, timezone
+from typing import List, Optional
 
+from dotenv import load_dotenv
 from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
-from sqlalchemy.orm import Session
-
-from database import Base, engine, get_db
-from models import Note
-from schemas import (
-    NoteCreate,
-    NoteResponse,
-    NoteUpdate,
-    SyncNote,
-    SyncRequest,
-    SyncResult,
+from pydantic import BaseModel, ConfigDict, Field
+from sqlalchemy import (
+    Boolean,
+    Column,
+    DateTime,
+    Index,
+    String,
+    create_engine,
+    text,
 )
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+load_dotenv()
+
+DATABASE_URL = os.getenv(
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/simplenotes"
+)
+
+connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+
+engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
+
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+def _utcnow() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _new_uuid() -> str:
+    return str(uuid.uuid4())
+
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id = Column(String, primary_key=True, default=_new_uuid)
+    title = Column(String, nullable=False, default="")
+    content = Column(String, nullable=False, default="")
+    created_at = Column(DateTime(timezone=True), nullable=False, default=_utcnow)
+    updated_at = Column(
+        DateTime(timezone=True), nullable=False, default=_utcnow, onupdate=_utcnow
+    )
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    user_id = Column(String, nullable=False, default="default_user")
+
+    __table_args__ = (
+        Index("ix_notes_user_id", "user_id"),
+        Index("ix_notes_created_at", "created_at"),
+    )
+
+
+class NoteBase(BaseModel):
+    title: str = Field(default="", max_length=512)
+    content: str = Field(default="")
+
+
+class NoteCreate(NoteBase):
+    user_id: str = Field(default="default_user", max_length=255)
+
+
+class NoteUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, max_length=512)
+    content: Optional[str] = None
+    is_deleted: Optional[bool] = None
+
+
+class NoteResponse(NoteBase):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    created_at: datetime
+    updated_at: datetime
+    is_deleted: bool
+    user_id: str
+
+
+class SyncNote(BaseModel):
+    id: Optional[str] = None
+    title: str = Field(default="", max_length=512)
+    content: str = Field(default="")
+    is_deleted: bool = False
+    user_id: str = Field(default="default_user", max_length=255)
+    updated_at: Optional[datetime] = None
+
+
+class SyncRequest(BaseModel):
+    notes: List[SyncNote] = Field(default_factory=list)
+
+
+class SyncResult(BaseModel):
+    created: int
+    updated: int
+    skipped: int
+    notes: List[NoteResponse]
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -54,14 +149,14 @@ async def health(db: Session = Depends(get_db)):
         )
 
 
-@app.get("/notes", response_model=list[NoteResponse])
+@app.get("/notes", response_model=List[NoteResponse])
 async def list_notes(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     db: Session = Depends(get_db),
 ):
     try:
-        notes = (
+        return (
             db.query(Note)
             .filter(Note.is_deleted.is_(False))
             .order_by(Note.created_at.desc())
@@ -69,7 +164,6 @@ async def list_notes(
             .limit(limit)
             .all()
         )
-        return notes
     except SQLAlchemyError:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -85,11 +179,7 @@ async def get_note(note_id: str, db: Session = Depends(get_db)):
 @app.post("/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(payload: NoteCreate, db: Session = Depends(get_db)):
     try:
-        note = Note(
-            title=payload.title,
-            content=payload.content,
-            user_id=payload.user_id,
-        )
+        note = Note(title=payload.title, content=payload.content, user_id=payload.user_id)
         db.add(note)
         db.commit()
         db.refresh(note)
@@ -174,8 +264,7 @@ async def sync_notes(payload: SyncRequest, db: Session = Depends(get_db)):
     counters = {"created": 0, "updated": 0, "skipped": 0}
     try:
         for incoming in payload.notes:
-            outcome = _reconcile_note(db, incoming)
-            counters[outcome] += 1
+            counters[_reconcile_note(db, incoming)] += 1
         db.commit()
         notes = (
             db.query(Note)

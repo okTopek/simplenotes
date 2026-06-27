@@ -7,8 +7,8 @@ from sqlalchemy.orm import sessionmaker
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_main.db")
 
-from database import Base, get_db  # noqa: E402
 import main  # noqa: E402
+from main import Base, get_db  # noqa: E402
 
 TEST_DATABASE_URL = "sqlite:///./test_main.db"
 engine = create_engine(TEST_DATABASE_URL, connect_args={"check_same_thread": False})
