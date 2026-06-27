@@ -43,8 +43,9 @@ export default function CameraScreen({ navigation }) {
     if (!cameraRef.current) return;
     setBusy(true);
     try {
-      const result = await cameraRef.current.takePictureAsync({ quality: 0.6 });
-      setPhoto(result.uri);
+      // Low quality + base64 so the photo can be stored in the DB and synced.
+      const result = await cameraRef.current.takePictureAsync({ quality: 0.4, base64: true });
+      setPhoto(`data:image/jpeg;base64,${result.base64}`);
     } catch (err) {
       Alert.alert("Camera error", "Could not capture the photo.");
     } finally {

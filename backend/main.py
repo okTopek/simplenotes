@@ -85,6 +85,7 @@ class Note(Base):
     )
     is_deleted = Column(Boolean, nullable=False, default=False)
     user_id = Column(String, nullable=False, default="default_user")
+    photo = Column(String, nullable=True)
 
     __table_args__ = (
         Index("ix_notes_user_id", "user_id"),
@@ -95,6 +96,7 @@ class Note(Base):
 class NoteBase(BaseModel):
     title: str = Field(default="", max_length=512)
     content: str = Field(default="")
+    photo: Optional[str] = None
 
 
 class NoteCreate(NoteBase):
@@ -104,6 +106,7 @@ class NoteCreate(NoteBase):
 class NoteUpdate(BaseModel):
     title: Optional[str] = Field(default=None, max_length=512)
     content: Optional[str] = None
+    photo: Optional[str] = None
     is_deleted: Optional[bool] = None
 
 
@@ -121,6 +124,7 @@ class SyncNote(BaseModel):
     id: Optional[str] = None
     title: str = Field(default="", max_length=512)
     content: str = Field(default="")
+    photo: Optional[str] = None
     is_deleted: bool = False
     user_id: str = Field(default="default_user", max_length=255)
     updated_at: Optional[datetime] = None
@@ -138,6 +142,21 @@ class SyncResult(BaseModel):
 
 
 Base.metadata.create_all(bind=engine)
+
+
+def _ensure_schema():
+    # create_all() only creates missing tables, not missing columns. The 'photo'
+    # column was added after the table already existed on Railway, so add it here.
+    if IS_SQLITE:
+        return
+    try:
+        with engine.begin() as conn:
+            conn.execute(text("ALTER TABLE notes ADD COLUMN IF NOT EXISTS photo VARCHAR"))
+    except SQLAlchemyError as exc:
+        print(f"[schema] could not ensure 'photo' column: {exc}")
+
+
+_ensure_schema()
 
 app = FastAPI(title="SimpleNotes API", version="1.0.0")
 
@@ -204,7 +223,12 @@ async def get_note(note_id: str, db: Session = Depends(get_db)):
 @app.post("/notes", response_model=NoteResponse, status_code=status.HTTP_201_CREATED)
 async def create_note(payload: NoteCreate, db: Session = Depends(get_db)):
     try:
-        note = Note(title=payload.title, content=payload.content, user_id=payload.user_id)
+        note = Note(
+            title=payload.title,
+            content=payload.content,
+            photo=payload.photo,
+            user_id=payload.user_id,
+        )
         db.add(note)
         db.commit()
         db.refresh(note)
@@ -259,6 +283,7 @@ def _reconcile_note(db: Session, incoming: SyncNote) -> str:
         note = Note(
             title=incoming.title,
             content=incoming.content,
+            photo=incoming.photo,
             is_deleted=incoming.is_deleted,
             user_id=incoming.user_id,
         )
@@ -279,6 +304,7 @@ def _reconcile_note(db: Session, incoming: SyncNote) -> str:
 
     existing.title = incoming.title
     existing.content = incoming.content
+    existing.photo = incoming.photo
     existing.is_deleted = incoming.is_deleted
     existing.user_id = incoming.user_id
     return "updated"

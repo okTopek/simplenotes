@@ -38,6 +38,7 @@ function NoteDetail({ note, onEdit, onDelete }) {
           </button>
         </div>
       </div>
+      {note.photo && <img className="detail__photo" src={note.photo} alt="Note attachment" />}
       <p className="detail__content">{note.content || "No content"}</p>
       {note.updated_at && (
         <p className="detail__meta">Updated {new Date(note.updated_at).toLocaleString()}</p>

@@ -162,6 +162,24 @@ body {
   white-space: nowrap;
 }
 
+.note-item__thumb {
+  width: 100%;
+  max-height: 120px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.detail__photo {
+  max-width: 100%;
+  max-height: 360px;
+  object-fit: contain;
+  border-radius: 10px;
+  margin: 0 0 1rem;
+  display: block;
+}
+
 .badge {
   position: absolute;
   top: 0.5rem;

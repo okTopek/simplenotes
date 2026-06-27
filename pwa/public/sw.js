@@ -1,4 +1,4 @@
-const CACHE_NAME = "simplenotes-static-v1";
+const CACHE_NAME = "simplenotes-static-v2";
 const API_CACHE_NAME = "simplenotes-api-v1";
 const DB_NAME = "simplenotes";
 const PENDING_STORE = "pending";
@@ -83,9 +83,26 @@ async function cacheFirst(request) {
   }
 }
 
+// Navigations (the HTML document) must be network-first so a new deploy is
+// picked up immediately — otherwise a cached index.html keeps pointing at an
+// old, now-missing JS bundle and the app breaks until the cache is cleared.
+async function navigationHandler(request) {
+  try {
+    return await fetch(request);
+  } catch (err) {
+    const cached = await caches.match("/index.html");
+    return cached || Response.error();
+  }
+}
+
 self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  if (request.mode === "navigate") {
+    event.respondWith(navigationHandler(request));
+    return;
+  }
 
   if (isApiRequest(url)) {
     if (request.method === "GET") {

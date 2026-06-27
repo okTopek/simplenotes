@@ -36,6 +36,7 @@ export default function NotesList({ notes, selectedId, query, onQueryChange, onS
               }`}
               onClick={() => onSelect(note)}
             >
+              {note.photo && <img className="note-item__thumb" src={note.photo} alt="" />}
               <h3 className="note-item__title">{note.title || "Untitled"}</h3>
               <p className="note-item__preview">{(note.content || "").slice(0, 80) || "No content"}</p>
               {note._pending && <span className="badge">unsynced</span>}
