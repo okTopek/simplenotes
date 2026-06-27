@@ -1,0 +1,13 @@
+# Copy to terraform.tfvars and fill in. Do NOT commit terraform.tfvars.
+# Alternatively, export RAILWAY_TOKEN instead of setting railway_token here.
+
+railway_token = "your_railway_token_here"
+github_repo   = "https://github.com/your-username/simplenotes"
+github_branch = "main"
+
+# Optional overrides (defaults shown):
+# db_user           = "simplenotes"
+# db_name           = "simplenotes"
+# pg_private_host   = "simplenotes-db.railway.internal"
+# backend_subdomain = "simplenotes-api"
+# pwa_subdomain     = "simplenotes-pwa"
