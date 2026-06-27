@@ -21,13 +21,38 @@ from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 load_dotenv()
 
-DATABASE_URL = os.getenv(
-    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/simplenotes"
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "DATABASE_URL is not set.\n"
+        "Set it before starting the app, for example:\n"
+        "  export DATABASE_URL='postgresql://user:password@host:5432/simplenotes'\n"
+        "On Railway: add a PostgreSQL service and reference its DATABASE_URL variable\n"
+        "in the backend service (e.g. DATABASE_URL=${{Postgres.DATABASE_URL}})."
+    )
 
-connect_args = {"check_same_thread": False} if DATABASE_URL.startswith("sqlite") else {}
+# Railway/Heroku expose 'postgres://', which SQLAlchemy 2.x does not accept.
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-engine = create_engine(DATABASE_URL, pool_pre_ping=True, connect_args=connect_args)
+IS_SQLITE = DATABASE_URL.startswith("sqlite")
+
+if IS_SQLITE:
+    engine = create_engine(
+        DATABASE_URL,
+        connect_args={"check_same_thread": False},
+        pool_pre_ping=True,
+    )
+else:
+    engine = create_engine(
+        DATABASE_URL,
+        pool_pre_ping=True,
+        pool_size=int(os.getenv("DB_POOL_SIZE", "5")),
+        max_overflow=int(os.getenv("DB_MAX_OVERFLOW", "10")),
+        pool_recycle=int(os.getenv("DB_POOL_RECYCLE", "1800")),
+        pool_timeout=int(os.getenv("DB_POOL_TIMEOUT", "30")),
+    )
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
